@@ -56,10 +56,15 @@ def gee(keyword, round_constant, byte_sub_table):
     '''
     rotated_word = keyword.deep_copy()
     rotated_word << 8
+    print("rotated word: ", rotated_word.get_bitvector_in_hex())
     newword = BitVector(size = 0)
     for i in range(4):
+        #print("needed vals: ",rotated_word[8*i:8*i+8].intValue())
+        #print("needed vals sub: ",byte_sub_table[rotated_word[8 * i:8 * i + 8].intValue()])
         newword += BitVector(intVal = byte_sub_table[rotated_word[8*i:8*i+8].intValue()], size = 8)
+        #print(newword.get_bitvector_in_hex())
     newword[:8] ^= round_constant
+    print("XORED: ", round_constant.get_hex_string_from_bitvector(), "new word: ", newword.get_hex_string_from_bitvector())
     round_constant = round_constant.gf_multiply_modular(BitVector(intVal = 0x02), AES_modulus, 8)
     return newword, round_constant
 
@@ -75,10 +80,13 @@ def gen_key_schedule_128(key_bv):
         key_words[i] = key_bv[i*32 : i*32 + 32]
     for i in range(4,44):
         if i%4 == 0:
+            print("prev round key: ", key_words[i-1].get_bitvector_in_hex(), "round const: ", round_constant.get_bitvector_in_hex())
             kwd, round_constant = gee(key_words[i-1], round_constant, byte_sub_table)
             key_words[i] = key_words[i-4] ^ kwd
+            print("new_word: ", kwd.get_bitvector_in_hex(), "keyword: ", key_words[i].get_bitvector_in_hex(),int(round_constant), )
         else:
             key_words[i] = key_words[i-4] ^ key_words[i-1]
+        print(key_words[i].get_bitvector_in_hex())
     return key_words
 
 def gen_key_schedule_192(key_bv):

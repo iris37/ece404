@@ -13,19 +13,28 @@ from DES_patel import *
 
 
 def file_as_bits(inputfile):
+    """
+	Takes in a file and returns it in binary form.
+    """
     read_bits = os.path.getsize(inputfile) * 8
     bv = BitVector(filename=inputfile)
     bitvec = bv.read_bits_from_file(read_bits)
     return bitvec
 
-def bit_changes(f1, f2):
+def bit_changes(f1,f2):
+    """ Compares two files and returns
+   	how many bits are different.
+    """
     bits1 = file_as_bits(f1)
     bits2 = file_as_bits(f2)
     changes = bits1 ^ bits2
-    return changes.count_bits(), len(bits1) / 64
+    return changes.count_bits(), bits1.length()/64
 
 
 def populate_sboxes():
+    """
+	Randomaly populates 8 4x16 sboxes.
+    """
     x = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     s_boxes = {i:None for i in range(8)}
 
@@ -42,9 +51,12 @@ def populate_sboxes():
     return s_boxes
 
 
-def substitution(expanded_half_block):  # Takes in 48 bit expanded half-block
+def substitution(expanded_half_block, sboxes):  # Takes in 48 bit expanded half-block
+    """
+	Performs Substitution with a passed in sbox.
+    """
     s_boxes_output = BitVector(size=32)
-    s_boxes = populate_sboxes()
+    s_boxes = sboxes
     blocks = [expanded_half_block[i*6:i*6+6] for i in range(8)]
     for i in range(len(blocks)):
         row_index = int(2*blocks[i][0] + blocks[i][-1])
@@ -53,7 +65,10 @@ def substitution(expanded_half_block):  # Takes in 48 bit expanded half-block
     return s_boxes_output  # Returns a 32 bit block
 
 
-def DES_diff_sboxes(inputfile, outputfile, decrypt=False):
+def DES_diff_sboxes(inputfile, outputfile, sboxes, decrypt=False):
+    """
+    	Altered DES to account for different sboxes.
+    """
     key = get_encryption_key()
     round_keys = generate_round_keys(key)
     if decrypt:
@@ -69,7 +84,7 @@ def DES_diff_sboxes(inputfile, outputfile, decrypt=False):
             for round_key in round_keys:
                 newRE = RE.permute(expansion_permutation)
                 out_xor = newRE ^ round_key
-                sbox_output = substitution(out_xor)
+                sbox_output = substitution(out_xor, sboxes)
                 pbox_output = permutation(sbox_output)
                 RE_modified = pbox_output ^ LE
                 LE = RE
@@ -80,51 +95,53 @@ def DES_diff_sboxes(inputfile, outputfile, decrypt=False):
     return
 
 
-def diffusion_plaintext(inputfile):
+def diffusion(inputfile, sbox=None):
+    """
+	One bit in the plaintext (inputfile) is changed.
+	The new altered plaintext is written out to a file.
+	If we are doing Problem 1 skip to else statement.
+	If we are doing Problem 2 enter if block.
+	In both scenarios DES is performed with the original and 
+	altered plaintexts, and the outputs are compared.
+    """
     orig_plaintext_bits = file_as_bits(inputfile)
     bit_to_change = random.randrange(orig_plaintext_bits.length())
     orig_plaintext_bits[bit_to_change] ^= 1
 
-    FILEOUT = open("altered_plaintext.txt", 'ab')
+    FILEOUT = open("altered_plaintext.txt", 'wb')
     orig_plaintext_bits.write_to_file(FILEOUT)
     FILEOUT.close()
+    if sbox:
+	DES_diff_sboxes(inputfile, "ciphertext_orig.txt", sbox)
+	DES_diff_sboxes("altered_plaintext.txt", "ciphertext_altered.txt", sbox)
+    else:
+    	DES(inputfile, "ciphertext_orig.txt")
+    	DES("altered_plaintext.txt", "ciphertext_altered.txt")
 
-    DES(inputfile, "ciphertext_orig.txt")
-    DES("altered_plaintext.txt", "ciphertext_altered.txt")
-
-    changed_bits, num_blocks = bit_changes("ciphertext_orig.txt", "ciphertext_altered.txt")
+    changed_bits,_ = bit_changes("ciphertext_orig.txt", "ciphertext_altered.txt")
 
     os.remove("ciphertext_orig.txt")
     os.remove("altered_plaintext.txt")
     os.remove("ciphertext_altered.txt")
 
-    return changed_bits, changed_bits / num_blocks
+    return changed_bits
 
 
-def diffusion_sboxes(inputfile):
+def confusion(inputfile):
+    """ 
+	Performs DES before the key is altered. 
+	Then one bit in the key is altered.
+	The new key is then written to a file.
+	DES is performed again with the altered key.
+	The two cipher texts are then compared.
+    """
     DES(inputfile, "ciphertext_orig.txt")
-    DES_diff_sboxes(inputfile, "ciphertext_diff_sbox1.txt")
-    DES_diff_sboxes(inputfile, "ciphertext_diff_sbox2.txt")
-
-    changed_bits1, num_blocks1 = bit_changes("ciphertext_orig.txt", "ciphertext_diff_sbox1.txt")
-    changed_bits2, num_blocks2 = bit_changes("ciphertext_orig.txt", "ciphertext_diff_sbox2.txt")
-
-    os.remove("ciphertext_orig.txt")
-    os.remove("ciphertext_diff_sbox1.txt")
-    os.remove("ciphertext_diff_sbox2.txt")
-
-    return changed_bits1, changed_bits1 / num_blocks1, changed_bits2, changed_bits2 / num_blocks2
-
-
-def confusion(inputfile, key_file):
-    DES(inputfile, "ciphertext_orig.txt")
-    orig_key_bits = file_as_bits(key_file)
+    orig_key_bits = file_as_bits("key.txt")
     bit_to_change = random.randrange(orig_key_bits.length())
     orig_key_bits[bit_to_change] ^= 1
+    os.remove("key.txt")
 
-    os.remove(key_file)
-
-    FILEOUT = open(key_file, 'wb')
+    FILEOUT = open("key.txt", 'wb')
     orig_key_bits.write_to_file(FILEOUT)
     FILEOUT.close()
 
@@ -135,18 +152,32 @@ def confusion(inputfile, key_file):
     os.remove("ciphertext_orig.txt")
     os.remove("ciphertext_altered.txt")
 
-    return changed_bits, changed_bits / num_blocks
+    return changed_bits / num_blocks
 
 
 if __name__ == '__main__':
-    # Problem 1
-    total_changed, avg_bits_changed = diffusion_plaintext("message.txt")
-    print(total_changed, avg_bits_changed)
+  
+   # Problem 1
+    avg_bits_changed = []
+    for _ in range(20):
+    	bits_changed = diffusion("message.txt")
+	avg_bits_changed.append(bits_changed)
+	#print(bits_changed)
+    print(sum(avg_bits_changed) / len(avg_bits_changed))
 
     # Problem 2
-    total_changed1, avg_bits_changed1, total_changed2, avg_bits_changed2 = diffusion_sboxes("message.txt")
-    print(total_changed1, avg_bits_changed1, total_changed2, avg_bits_changed2)
-
+    sbox1 = populate_sboxes()
+    sbox2 = populate_sboxes()
+    avg_bits_changed = []
+    results = []
+    for sbox in [sbox1, sbox2]:
+	for _ in range(20):
+    		bits_changed = diffusion("message.txt", sbox)
+		avg_bits_changed.append(bits_changed)
+    	avg = sum(avg_bits_changed) / len(avg_bits_changed)
+    	results.append(avg)
+    print(results[0], results[1])
+  
     # Problem 3
     total = 0
     for key in ["ecepurdu", "direwolf", 'oldmaner', 'abcdefgh']:
@@ -154,29 +185,28 @@ if __name__ == '__main__':
         with open("key.txt", 'w') as f:
             f.write(key)
 
-        total_changed, avg_bits_changed = confusion("message.txt", "key.txt")
-        total += avg_bits_changed
-    print(total_changed)
+        bits_changed = confusion("message.txt")
+	total += bits_changed
     print (total / 4)
 
     '''
         Problem 1:
 
-            Total Bits Changed in Ciphertext: 4590
-            Average bits changed per 64 bit block : 22.58
+            Average bits changed: 32
 
         Problem 2:
 
             For Random Sbox Generation 1:
-                Total Bits Changed in Ciphertext: 5931
-                Average bits changed per 64 bit block : 29.18
+               
+                Average bits changed: 30
 
             For Random Sbox Generation 2:
-                Total Bits Changed in Ciphertext: 5951
-                Average bits changed per 64 bit block : 29.28
+                
+                Average bits changed: 31
+	    
+	    Total Average: 30.5
 
         Problem 3:
 
-             Total Bits Changed in Ciphertext for all 4 keys: 5946
-            Average bits changed per 64 bit block: 29.25
+        	Average bits changed: 31
     '''

@@ -7,7 +7,6 @@ __author__ = 'Parth'
 # Due Date: February 9, 2017
 
 from BitVector import BitVector
-import copy
 
 AES_modulus = BitVector(bitstring='100011011')
 
@@ -59,7 +58,7 @@ def gen_subbytes_table():
     return subBytesTable
 
 
-def gee(keyword, round_constant, byte_sub_table):
+def gee(keyword, round_num_constant, byte_sub_table):
     '''
     This is the g() function you see in Figure 4 of Lecture 8.
     '''
@@ -68,24 +67,24 @@ def gee(keyword, round_constant, byte_sub_table):
     newword = BitVector(size=0)
     for i in range(4):
         newword += BitVector(intVal=byte_sub_table[rotated_word[8 * i:8 * i + 8].intValue()], size=8)
-    newword[:8] ^= round_constant
-    round_constant = round_constant.gf_multiply_modular(BitVector(intVal=0x02), AES_modulus, 8)
-    return newword, round_constant
+    newword[:8] ^= round_num_constant
+    round_num_constant = round_num_constant.gf_multiply_modular(BitVector(intVal=0x02), AES_modulus, 8)
+    return newword, round_num_constant
 
 
 def gen_key_schedule_128(key_bv):
     byte_sub_table = gen_subbytes_table()
     #  We need 44 keywords in the key schedule for 128 bit AES.  Each keyword is 32-bits
     #  wide. The 128-bit AES uses the first four keywords to xor the input block with.
-    #  Subsequently, each of the 10 rounds uses 4 keywords from the key schedule. We will
+    #  Subsequently, each of the 10 round_nums uses 4 keywords from the key schedule. We will
     #  store all 44 keywords in the following list:
     key_words = [None for i in range(44)]
-    round_constant = BitVector(intVal=0x01, size=8)
+    round_num_constant = BitVector(intVal=0x01, size=8)
     for i in range(4):
         key_words[i] = key_bv[i * 32: i * 32 + 32]
     for i in range(4, 44):
         if i % 4 == 0:
-            kwd, round_constant = gee(key_words[i - 1], round_constant, byte_sub_table)
+            kwd, round_num_constant = gee(key_words[i - 1], round_num_constant, byte_sub_table)
             key_words[i] = key_words[i - 4] ^ kwd
         else:
             key_words[i] = key_words[i - 4] ^ key_words[i - 1]
@@ -93,7 +92,7 @@ def gen_key_schedule_128(key_bv):
 
 
 def encrypt(inputfile, outputfile):
-    f = open('hexfile.txt', 'a')
+    f = open('encrypted_hex.txt', 'a')
     key = get_encryption_key()
     key_words = gen_key_schedule_128(key)
     subBytesTable, _ = genTables()
@@ -108,13 +107,13 @@ def encrypt(inputfile, outputfile):
             if len(bitvec) != 128:
                 bitvec.pad_from_right(128 - len(bitvec))
 
-            #Filling in statearray and XORing
+            # Filling in statearray and XORing
             for i in range(4):
                 for j in range(4):
                     statearray[i][j] = bitvec[32 * i + 8 * j:32 * i + 8 * (j + 1)]
                     statearray[i][j] ^= key_words[i][8 * j:8 + (8 * j)]
 
-            for round in range(10):
+            for round_num in range(10):
 
                 # SubBytes
                 for i in range(4):
@@ -129,7 +128,7 @@ def encrypt(inputfile, outputfile):
                         statearray[j][i] = temp_shift[j]
 
                 # ColumnMixing
-                if round != 9:
+                if round_num != 9:
                     two_times = BitVector(bitstring='00000010')
                     three_times = BitVector(bitstring='00000011')
                     for i in range(4):
@@ -157,13 +156,11 @@ def encrypt(inputfile, outputfile):
                         statearray[i][1] = temp1
                         statearray[i][2] = temp2
                         statearray[i][3] = temp3
-
-
                     
-                # Add Round Key
+                # Add round_num Key
                 for i in range(4):
                     for j in range(4):
-                        statearray[i][j] ^= key_words[(4 * (round + 1)) + i][8 * j:8 + (8 * j)]
+                        statearray[i][j] ^= key_words[(4 * (round_num + 1)) + i][8 * j:8 + (8 * j)]
 
             for i in range(4):
                 for j in range(4):
@@ -175,7 +172,7 @@ def encrypt(inputfile, outputfile):
 
 
 def decrypt(inputfile, outputfile):
-    f = open('hexdecrypt.txt', 'a')
+    f = open('decrypted_hex.txt', 'a')
     temp_shift = [0]*4
     key = get_encryption_key()
     key_words = gen_key_schedule_128(key)
@@ -195,8 +192,7 @@ def decrypt(inputfile, outputfile):
                     statearray[i][j] = bitvec[32 * i + 8 * j:32 * i + 8 * (j + 1)]
                     statearray[i][j] ^= key_words[-(4-i)][8 * j:8 + (8 * j)]
 
-
-            for round in range(10,0,-1):
+            for round_num in range(10,0,-1):
                 # Inverse ShiftRows
                 for i in range(1,4):
                     for j in range(0,4):
@@ -209,13 +205,13 @@ def decrypt(inputfile, outputfile):
                     for j in range(4):
                         statearray[i][j] = BitVector(intVal=invSubBytesTable[int(statearray[i][j])])
 
-                # Add Round Key
+                # Add round_num Key
                 for i in range(4):
                     for j in range(4):
-                        statearray[i][j] ^= key_words[(4*(round-1))+i][8 * j:8 + (8 * j)]
+                        statearray[i][j] ^= key_words[(4*(round_num-1))+i][8 * j:8 + (8 * j)]
 
                 # Inverse ColumnMixing
-                if round != 1:
+                if round_num != 1:
                     zeroE = BitVector(bitstring='00001110')
                     zeroB = BitVector(bitstring='00001011')
                     zeroD = BitVector(bitstring='00001101')
@@ -260,9 +256,9 @@ if __name__ == '__main__':
         os.remove('encrypted.txt')
     if os.path.isfile('decrypted.txt'):
         os.remove('decrypted.txt')
-    if os.path.isfile('hexfile.txt'):
-        os.remove('hexfile.txt')
-    if os.path.isfile('hexdecrypt.txt'):
-        os.remove('hexdecrypt.txt')
+    if os.path.isfile('encrypted_hex.txt'):
+        os.remove('encrypted_hex.txt')
+    if os.path.isfile('decrypted_hex.txt'):
+        os.remove('decrypted_hex.txt')
     encrypt('plaintext.txt', 'encrypted.txt')
     decrypt('encrypted.txt', 'decrypted.txt')

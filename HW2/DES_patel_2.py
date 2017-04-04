@@ -15,6 +15,48 @@ expansion_permutation = [31, 0, 1, 2, 3, 4, 3, 4, 5, 6, 7, 8, 7, 8, 9,
                          17, 18, 19, 20, 19, 20, 21, 22, 23, 24, 23,
                          24, 25, 26, 27, 28, 27, 28, 29, 30, 31, 0]
 
+s_boxes = {i:None for i in range(8)}
+
+s_boxes[0] = [ [14,4,13,1,2,15,11,8,3,10,6,12,5,9,0,7],
+               [0,15,7,4,14,2,13,1,10,6,12,11,9,5,3,8],
+               [4,1,14,8,13,6,2,11,15,12,9,7,3,10,5,0],
+               [15,12,8,2,4,9,1,7,5,11,3,14,10,0,6,13] ]
+
+s_boxes[1] = [ [15,1,8,14,6,11,3,4,9,7,2,13,12,0,5,10],
+               [3,13,4,7,15,2,8,14,12,0,1,10,6,9,11,5],
+               [0,14,7,11,10,4,13,1,5,8,12,6,9,3,2,15],
+               [13,8,10,1,3,15,4,2,11,6,7,12,0,5,14,9] ]
+
+s_boxes[2] = [ [10,0,9,14,6,3,15,5,1,13,12,7,11,4,2,8],
+               [13,7,0,9,3,4,6,10,2,8,5,14,12,11,15,1],
+               [13,6,4,9,8,15,3,0,11,1,2,12,5,10,14,7],
+               [1,10,13,0,6,9,8,7,4,15,14,3,11,5,2,12] ]
+
+s_boxes[3] = [ [7,13,14,3,0,6,9,10,1,2,8,5,11,12,4,15],
+               [13,8,11,5,6,15,0,3,4,7,2,12,1,10,14,9],
+               [10,6,9,0,12,11,7,13,15,1,3,14,5,2,8,4],
+               [3,15,0,6,10,1,13,8,9,4,5,11,12,7,2,14] ]
+
+s_boxes[4] = [ [2,12,4,1,7,10,11,6,8,5,3,15,13,0,14,9],
+               [14,11,2,12,4,7,13,1,5,0,15,10,3,9,8,6],
+               [4,2,1,11,10,13,7,8,15,9,12,5,6,3,0,14],
+               [11,8,12,7,1,14,2,13,6,15,0,9,10,4,5,3] ]
+
+s_boxes[5] = [ [12,1,10,15,9,2,6,8,0,13,3,4,14,7,5,11],
+               [10,15,4,2,7,12,9,5,6,1,13,14,0,11,3,8],
+               [9,14,15,5,2,8,12,3,7,0,4,10,1,13,11,6],
+               [4,3,2,12,9,5,15,10,11,14,1,7,6,0,8,13] ]
+
+s_boxes[6] = [ [4,11,2,14,15,0,8,13,3,12,9,7,5,10,6,1],
+               [13,0,11,7,4,9,1,10,14,3,5,12,2,15,8,6],
+               [1,4,11,13,12,3,7,14,10,15,6,8,0,5,9,2],
+               [6,11,13,8,1,4,10,7,9,5,0,15,14,2,3,12] ]
+
+s_boxes[7] = [ [13,2,8,4,6,15,11,1,10,9,3,14,5,0,12,7],
+               [1,15,13,8,10,3,7,4,12,5,6,11,0,14,9,2],
+               [7,11,4,1,9,12,14,2,0,6,10,13,15,3,5,8],
+               [2,1,14,7,4,10,8,13,15,12,9,0,3,5,6,11] ]
+
 pbox_permutation = [ 15,  6, 19, 20, 28, 11, 27, 16,
                       0, 14, 22, 25,  4, 17, 30,  9,
                       1,  7, 23, 13, 31, 26,  2,  8,
@@ -33,25 +75,8 @@ key_permutation_2 = [13,16,10,23,0,4,2,27,14,5,20,9,22,18,11,
 shifts_for_round_key_gen = [1,1,2,2,2,2,2,2,1,2,2,2,2,2,2,1]
 
 
-def get_sboxes(filename):
-    """
-	Reads in sboxes from file.
-    """
-    s_boxes = [[]] * 8
-    j = 0
-    with open(filename, 'r') as f:
-        content = f.readlines()
-    for entry in content[1:]:
-        if ":" in entry:
-            j += 1
-        if "\n" != entry and ":" not in entry:
-            s_boxes[j].append(list(map(int, entry.split())))
-    return s_boxes
-
-
 def substitution(expanded_half_block):  # Takes in 48 bit expanded half-block
     s_boxes_output = BitVector(size=32)
-    s_boxes = get_sboxes('s-box-tables.txt')
     blocks = [expanded_half_block[i*6:i*6+6] for i in range(8)]
     for i in range(len(blocks)):
         row_index = int(2*blocks[i][0] + blocks[i][-1])
@@ -90,7 +115,6 @@ def generate_round_keys(encryption_key):
         round_keys.append(round_key)
     return round_keys
 
-
 def DES(inputfile, outputfile, decrypt=False):
     key = get_encryption_key()
     round_keys = generate_round_keys(key)
@@ -102,37 +126,22 @@ def DES(inputfile, outputfile, decrypt=False):
         bitvec = bv.read_bits_from_file(64)
         if len(bitvec) > 0:
             if len(bitvec) != 64:
-		# Pad if not 64 block
                 bitvec.pad_from_right(64-len(bitvec))
             [LE, RE] = bitvec.divide_into_two()
             for round_key in round_keys:
-	        # Turn 32 bit half into 48 bit expanded block
                 newRE = RE.permute(expansion_permutation)
-		# XOR with round key
                 out_xor = newRE ^ round_key
-		# Perform substitution
                 sbox_output = substitution(out_xor)
-		# Perform last Permutation step
                 pbox_output = permutation(sbox_output)
-		# Modify output with left side
                 RE_modified = pbox_output ^ LE
-		# Perform swap
                 LE = RE
                 RE = RE_modified
-	    # Peform final swap before writing
             final_bitvec = RE + LE
             final_bitvec.write_to_file(FILEOUT)
     FILEOUT.close()
     return
 
-
 if __name__ == '__main__':
-    import os
-    os.remove('encrypted.txt')
-    os.remove('decrypted.txt')
-
-    # Encrypt
+    get_encryption_key()
     DES('message.txt', 'encrypted.txt')
-     
-    # Decrypt
     DES('encrypted.txt', 'decrypted.txt', True)

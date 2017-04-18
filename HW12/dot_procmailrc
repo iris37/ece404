@@ -1,0 +1,71 @@
+SHELL=/bin/sh
+PATH=/usr/local/lib/mh:$PATH
+MAILDIR=$HOME/Mail
+LOGFILE=$HOME/Mail/logfile
+SENDMAIL=/usr/sbin/sendmail
+#VERBOSE=1
+VERBOSE=0
+EOL="
+"
+LOG="$EOL$EOL$EOL"
+LOG="New message log:$EOL"
+LOG=`perl GET_MESSAGE_INDEX`
+LOG="$EOL"
+
+
+## Parth Patel
+## patel344
+## HW12 - Spam Filter
+## April 18, 2017
+
+
+## Recipe_1:
+##
+## Send mail with multiple emails in from field to spam folder.
+:0 :
+* ^From.*,
+spamFolder
+
+
+
+## Recipe_2:
+##
+## This recipe will send mail to spam folder based on subject field based on
+## key words that I know would not want emails about. Diploma and Degree 
+## were chosen as these because pertinenet emails regarding this would 
+## have specific words and phrases that my spam filter would know that
+## is meant specifically for me and not general college junk mail.
+:0 :
+* ^Subject.*(medication|Diploma|diploma|Degree|degree|Inteveo|cheap|buy|Buy|ills)
+spamFolder
+
+
+
+## Recipe_3:
+##
+## This will search the body of the message and look to get rid of anything offering me to make or get money.
+:0 B :
+* ($(?[0-9]*,?)*|EUR)
+spamFolder
+
+
+
+## Recipe_4:
+##
+## This recipe will get rid of mail with multipart or alternative content type.
+## Specifically content-type of plain and html.
+:0 HB :
+* ^Content-Type: multipart/alternative
+* ^Content-Type: text/plain
+* ^Content-Type: text/html
+spamFolder
+
+
+
+## Recipe_5:
+## 
+## The rest of the email to your special account will be 
+## deposited in the file spamFolder
+##
+:0 :
+/var/mail/ece404d3
